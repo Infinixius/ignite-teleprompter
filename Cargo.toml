@@ -20,3 +20,7 @@ tokio = { version= "1.37.0", features = ["full"] }
 tokio-stream = "0.1.15"
 warp = "0.3.6"
 websocket = "0.27.0"
+
+[patch.crates-io]
+# Fixes https://github.com/Infinixius/ignite-teleprompter/security/dependabot/16
+traitobject = { git = "https://github.com/reem/rust-traitobject", rev = "b3471a15917b2caf5a8b27debb0b4b390fc6634f" }

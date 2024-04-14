@@ -45,10 +45,10 @@ async fn main() {
 		DEBUG = true;
 	}
 	if matches.opt_present("p") {
-		PORT = matches.opt_str("p").unwrap().parse().unwrap();
+		PORT = matches.opt_str("p").expect("Invalid port argument (-p)").parse().unwrap();
 	}
 	if matches.opt_present("a") {
-		ADDRESS = matches.opt_str("a").unwrap();
+		ADDRESS = matches.opt_str("a").expect("Invalid address argument (-a)");
 	}
 
 	let (teleprompters_config_tx, mut _teleprompters_config_rx) = broadcast::channel::<TeleprompterConfig>(16);

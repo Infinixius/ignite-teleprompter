@@ -19,12 +19,11 @@ pub async fn start_server(teleprompters_config_bus: Sender<TeleprompterConfig>, 
     let initial_config: Arc<RwLock<TeleprompterConfig>> = Arc::new(RwLock::new(TeleprompterConfig::default()));
     let mut initial_config_rx = teleprompters_config_bus.subscribe();
 
-
     // Non blocking while loop with initial config
     let initial_config_clone = initial_config.clone();
     tokio::task::spawn(async move {
         while let Ok(msg) = initial_config_rx.recv().await {
-            let mut writer = initial_config_clone.write().unwrap();
+            let mut writer = initial_config_clone.write().expect("Failed to get write lock on initial config");
 
             *writer = msg;
         }
@@ -51,7 +50,7 @@ pub async fn start_server(teleprompters_config_bus: Sender<TeleprompterConfig>, 
         .and(warp::ws())
         .map(move |ws: Ws| {
             let teleprompter_config_rx = teleprompters_config_bus.subscribe();
-            let initial_config_clone = initial_config.read().unwrap().clone();
+            let initial_config_clone = initial_config.read().expect("Failed to get read lock on initial config").clone();
 
             ws.on_upgrade(move |socket| websocket_user_connected(socket, teleprompter_config_rx, initial_config_clone))
         });
@@ -61,7 +60,7 @@ pub async fn start_server(teleprompters_config_bus: Sender<TeleprompterConfig>, 
     let index = warp::path::end().map(move || warp::reply::html(html.clone()));
 
     let routes = index.or(ws).with(logger);
-    let server_address = std::net::SocketAddr::new(ADDRESS.parse().unwrap(), PORT);
+    let server_address = std::net::SocketAddr::new(ADDRESS.parse().expect("Failed to parse server_address"), PORT);
 
     log!("Server listening at: http://{} (Remote IP: http://{}:{})", server_address, local_ip().unwrap_or(std::net::Ipv4Addr::new(127, 0, 0, 1).into()), PORT);
     
@@ -78,13 +77,13 @@ async fn websocket_user_connected(ws: WebSocket, mut teleprompter_config_rx: Rec
     let mut _rx = UnboundedReceiverStream::new(rx);
 
     // // Send the initial config to the user
-    let message = Message::text(serde_json::to_string(&initial_config).unwrap());
-    user_ws_tx.send(message).await.unwrap();
+    let message = Message::text(serde_json::to_string(&initial_config).expect("Failed to serialize initial config"));
+    user_ws_tx.send(message).await.expect("Failed to send initial config to user");
 
     tokio::task::spawn(async move {
         while let Ok(msg) = teleprompter_config_rx.recv().await {
             // println!("Received message: {:?}", msg);
-            let message = Message::text(serde_json::to_string(&msg).unwrap());
+            let message = Message::text(serde_json::to_string(&msg).expect("Failed to serialize message"));
 
             if let Err(e) = user_ws_tx.send(message).await {
                 log!("Websocket send error: {}", e);

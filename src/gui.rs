@@ -4,6 +4,7 @@ use egui::{IconData, ScrollArea, TextEdit, Vec2};
 use image;
 use local_ip_address::local_ip;
 use serde::{Serialize, Deserialize};
+use std::net::{IpAddr, Ipv4Addr};
 use std::time::Instant;
 use tokio::sync::broadcast::Sender;
 
@@ -156,8 +157,16 @@ pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>, DEBUG: boo
 	};
 	let mut config_previous =  TeleprompterConfig::default();
 
-	let mut clipboard: ClipboardContext = ClipboardProvider::new().unwrap();
+	let mut clipboard: ClipboardContext = ClipboardProvider::new().expect("Failed to initialize clipboard");
 	let mut clipboard_timeout: i8 = 0;
+
+	// Get our IP address on the network that other devices use to connect to us
+	// If the call fails, we default to 127.0.0.1
+	let IP = local_ip().unwrap_or_else(|err| {
+		log!("Failed to get local IP address, defaulting to 127.0.0.1. Error: {:?}", err);
+
+		return IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+	});
 
 	let mut frame: u128 = 0;
 	let mut last_frame = Instant::now();
@@ -193,23 +202,19 @@ pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>, DEBUG: boo
 
             ui.heading("Ignite Teleprompter Manager");
 			ui.horizontal(|ui| {
-				// Get our IP address on the network that other devices use to connect to us
-				// If the call fails, we default to 127.0.0.1
-				let ip = local_ip().unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)));
-
-				ui.label("Teleprompter URL:");
+			ui.label("Teleprompter URL:");
 
 				// The following code will copy the URL to the clipboard when the user clicks on it,
 				// and will show a message for 60 frames saying that the URL was copied
 
 				let url_text = match clipboard_timeout > 0 {
 					true => "Copied to clipboard!".to_string(),
-					false => format!("http://{}:{}", ip, PORT)
+					false => format!("http://{}:{}", IP, PORT)
 				};
 
 				if ui.link(url_text).clicked() {
 					clipboard_timeout = 60;
-					clipboard.set_contents(format!("http://{}:{}", ip, PORT)).unwrap();
+					clipboard.set_contents(format!("http://{}:{}", IP, PORT)).expect("Failed to copy to clipboard");
 				}
 
 				if clipboard_timeout > 0 {
@@ -326,9 +331,9 @@ pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>, DEBUG: boo
 			if config.playing && !config.only_progress_changed(&config_previous) ||
 			   config.playing && config.only_progress_changed(&config_previous) && time_elapsed % 50 == 0 ||
 			  !config.playing {
-				teleprompters_config_bus.send(config.clone()).unwrap();
+				teleprompters_config_bus.send(config.clone()).expect("Failed to send teleprompter config over Websocket");
 				config_previous = config.clone();
 			}
 		}
-    }).unwrap();
+    }).expect("Failed to initialize egui");
 }

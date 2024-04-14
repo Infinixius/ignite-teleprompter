@@ -37,9 +37,26 @@
 		<script>
 			const PORT = "%PORT%"
 			const ws = new WebSocket(`ws://localhost:${PORT}/ws`)
-			const convertRGB = (r, g, b) => `rgb(${r * 255}, ${g * 255}, ${b * 255})`
 			let lastMessage = ""
+			
+			const convertRGB = (r, g, b) => `rgb(${r * 255}, ${g * 255}, ${b * 255})`
+			const scrollToPercentage = (percent, smooth) => {
+				let pos = lastMessage.reversed
 
+				if (lastMessage.reversed === true) {
+					window.scrollTo({
+						top: document.body.scrollHeight - (document.body.scrollHeight * (percent / 100)),
+						left: 0,
+						behavior: smooth ? "smooth" : "instant"
+					})
+				} else {
+					window.scrollTo({
+						top: document.body.scrollHeight * (percent / 100),
+						left: 0,
+						behavior: smooth ? "smooth" : "instant"
+					})
+				}
+			}
 			ws.addEventListener("open", () => {
 				console.log(`Connected to the server at "ws://localhost:${PORT}/ws"`)
 			})
@@ -47,23 +64,33 @@
 			ws.addEventListener("message", (event) => {
 				let message = JSON.parse(event.data)
 
-				console.log(message)
-				lastMessage = message
-
-				if (message.playing == false) {
-					if (message.reversed) {
-						window.scrollTo(0, document.body.scrollHeight - (document.body.scrollHeight * (message.progress / 100)))
-					} else {
-						window.scrollTo(0, document.body.scrollHeight * (message.progress / 100))
-					}
+				if (message.debug === true) {
+					// console.log(message)
 				}
 
+				if (message.playing === false) {
+					scrollToPercentage(message.progress, true)
+				}
+
+				// If the server changed the speed while we were playing, update the local speed
+				if (
+					lastMessage.playing === true && message.playing === true
+					&& lastMessage.speed !== message.speed
+				) {
+					localSpeed = message.speed
+				}
+
+				lastMessage = message
+
 				document.querySelector("#text").innerText = message.text + "\n \n END"
+
 				document.querySelector("#text").style.fontFamily = message.font
 				document.querySelector("#text").style.fontSize = message.font_size + "px"
 
 				document.querySelector("#text").style.color = convertRGB(message.font_color[0], message.font_color[1], message.font_color[2])
 				document.body.style.backgroundColor = convertRGB(message.background_color[0], message.background_color[1], message.background_color[2])
+
+				// TODO: Implement alignment
 
 				if (message.mirrored) {
 					document.querySelector("#text").classList.add("mirrored")
@@ -80,26 +107,55 @@
 
 			ws.onclose = () => {
 				console.log("Disconnected from the server")
+				// TODO: Implement disconnection logic
 			}
 
+			/* Client-side prediction */
+
+			// This code was probably the hardest part of this project,
+			// getting the server and client clocks to sync up was a huge
+			// problem and most solutions I tried had unfavorable side
+			// effects (noticable lag when pausing, not being feasible over
+			// websockets, etc).
+			// This solution is not perfect, but ultimately it works and the
+			// side effects are not very noticable.
+			// Basically, the solution is to let the client scroll by itself,
+			// and then controll the local speed based on if we're ahead or
+			// behind the server.
+
+			// TOOD: If we're a new client, use the server's progress as the new values
+			var localProgress = 0
+			var localSpeed = 0
+
 			setInterval(() => {
-				if (lastMessage.playing == true) {
-					let toPosition = 0
-					if (lastMessage.reversed == true) {
-						toPosition = document.body.scrollHeight - (document.body.scrollHeight * (lastMessage.progress / 100))
-					} else {
-						toPosition = document.body.scrollHeight * (lastMessage.progress / 100)
+				if (lastMessage.playing === true) {
+					// If we're ahead of the server, slow down
+					if (localProgress > lastMessage.progress + 1) localSpeed -= 0.0001
+					// If we're behind the server, speed up
+					if (localProgress < lastMessage.progress - 1) localSpeed += 0.0001
+
+					// Never allow the speed to go below 0
+					if (localSpeed < 0) localSpeed = 0
+
+					// For some reason setInterval runs faster than the server
+					// and 700 just seems to work. The client and server's progress
+					// will inevitably drift but we adjust the localSpeed to compensate
+					localProgress += localSpeed / 700
+
+					scrollToPercentage(localProgress, false)
+
+					if (lastMessage.debug === true) {
+						console.log(`Local: ${localProgress} \n Remote: ${lastMessage.progress} \n Difference: ${localProgress - lastMessage.progress} \n \n LocalSpeed: ${localSpeed} \n RemoteSpeed: ${lastMessage.speed}`)
 					}
 
-					// Tween the scroll position to the progress
-					window.scrollTo(0, window.scrollY + lastMessage.speed)
-
-					if (window.scrollY <= toPosition) {
-						console.log(`Unreasonable new position: ${window.scrollY} <= ${toPosition}`)
-						window.scrollTo(0, toPosition)
+					if (lastMessage.progress >= 100) {
+						lastMessage.playing = false
 					}
+				} else {
+					localProgress = lastMessage.progress
+					localSpeed = lastMessage.speed
 				}
-			})
+			}, 5)
 		</script>
 		<script>
 			// Keep the screen on by playing an empty video

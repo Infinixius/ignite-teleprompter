@@ -1,12 +1,13 @@
 use clipboard::{ClipboardContext, ClipboardProvider};
-use crossbeam::channel::Sender;
 use eframe::egui;
-use egui::{ScrollArea, TextEdit};
+use egui::{IconData, ScrollArea, TextEdit, Vec2};
+use image;
 use local_ip_address::local_ip;
 use serde::{Serialize, Deserialize};
+use std::time::Instant;
+use tokio::sync::broadcast::Sender;
 
-use crate::PORT;
-
+use crate::{DEBUG_LATENCY, PORT};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TeleprompterConfig {
 	playing: bool,
@@ -15,6 +16,7 @@ pub struct TeleprompterConfig {
 	speed: f32,
 	progress: f32,
 
+	align: Align,
 	font: Font,
 	font_size: i16,
 
@@ -22,7 +24,11 @@ pub struct TeleprompterConfig {
 	background_color: [f32; 3],
 
 	mirrored: bool,
-	reversed: bool
+	reversed: bool,
+
+	// TODO: Debugging mode, set by the command-line flag "--debug"
+	// Not intended for normal use
+	debug: bool,
 }
 
 impl Default for TeleprompterConfig {
@@ -34,14 +40,36 @@ impl Default for TeleprompterConfig {
 			speed: 1.0,
 			progress: 0.0,
 			
+			align: Align::Left,
 			font: Font::Arial,
-			font_size: 16,
+			font_size: 128,
 	
 			font_color: [1.0, 1.0, 1.0],
 			background_color: [0.0, 0.0, 0.0],
 	
 			mirrored: false,
-			reversed: false
+			reversed: false,
+
+			debug: true,
+		}
+	}
+}
+
+impl TeleprompterConfig {
+	fn only_progress_changed(self: &TeleprompterConfig, other: &TeleprompterConfig) -> bool {
+		if self.playing == other.playing &&
+		   self.text == other.text &&
+		   self.speed == other.speed &&
+		   self.progress != other.progress &&
+		   self.font == other.font &&
+		   self.font_size == other.font_size &&
+		   self.font_color == other.font_color &&
+		   self.background_color == other.background_color &&
+		   self.mirrored == other.mirrored &&
+		   self.reversed == other.reversed {
+			true
+		} else {
+			false
 		}
 	}
 }
@@ -71,9 +99,51 @@ impl ToString for Font {
 	}
 }
 
-pub fn init_gui(teleprompters_config_tx: Sender<TeleprompterConfig>) {
+#[derive(Debug, Hash, PartialEq, Clone, Serialize, Deserialize)]
+pub enum Align {
+	Left,
+	Center,
+	Right
+}
+
+impl ToString for Align {
+	fn to_string(&self) -> String {
+		match self {
+			Align::Left => "Left".to_string(),
+			Align::Center => "Center".to_string(),
+			Align::Right => "Right".to_string(),
+		}
+	}
+}
+
+// Helper function for loading the icon
+fn load_icon() -> IconData {
+    let (icon_rgba, icon_width, icon_height) = {
+        let icon = include_bytes!("../assets/icon.png");
+		let image = image::load_from_memory(icon)
+            .expect("Failed to open icon path")
+            .into_rgba8();
+        let (width, height) = image.dimensions();
+        let rgba = image.into_raw();
+        (rgba, width, height)
+    };
+
+    IconData {
+        rgba: icon_rgba,
+        width: icon_width,
+        height: icon_height,
+    }
+}
+
+pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>) {
 	let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([300.0, 530.0]),
+        viewport: egui::ViewportBuilder {
+			inner_size: Some(Vec2::new(300.0, 530.0)),
+			title: Some("Teleprompter Manager".to_owned()),
+			icon: Some(load_icon().into()),
+			..Default::default()
+		
+		},
         ..Default::default()
     };
 
@@ -83,27 +153,36 @@ pub fn init_gui(teleprompters_config_tx: Sender<TeleprompterConfig>) {
 	let mut clipboard: ClipboardContext = ClipboardProvider::new().unwrap();
 	let mut clipboard_timeout: i8 = 0;
 
-	let mut frame: u64 = 0;
+	let mut frame: u128 = 0;
+	let mut last_frame = Instant::now();
+	let mut time_elapsed: u128 = 0; // Represents the time elapsed since the program started
 
-    eframe::run_simple_native("Ignite Teleprompter Manager", options, move |ctx, _frame| {
+    eframe::run_simple_native("Teleprompter Manager", options, move |ctx, _frame| {
         egui::CentralPanel::default().show(ctx, |ui| {
 			// request_repaint puts egui into "Continuous mode",
 			// which means that the UI will be redrawn every frame
 			// (which is needed for the progress counter to work properly)
-			frame += 1;
 			ctx.request_repaint();
+			
+			// Calculate the time since the last frame
+			frame += 1;
+			let now = Instant::now();
+			let last_frame_time = now - last_frame;
+			
+			last_frame = now;
+			time_elapsed += last_frame_time.as_millis();
 
-			// Set to light mode
-			// ui.ctx().set_visuals(egui::Visuals::light());
+			// Set to dark mode
+			ui.ctx().set_visuals(egui::Visuals::dark());
 
-			// Update the progress every 30 frames if playing is true
-			if config.playing == true {
+			// Update the progress every five milliseconds
+			if config.playing == true && time_elapsed % 5 == 0 {
 				config.progress += config.speed / 100.0;
 				
 				if config.progress >= 100.0 {
 					config.progress = 100.0;
 					config.playing = false;
-				} 
+				}
 			}
 
             ui.heading("Ignite Teleprompter Manager");
@@ -159,7 +238,7 @@ pub fn init_gui(teleprompters_config_tx: Sender<TeleprompterConfig>) {
 			// Font dropdown
 			ui.horizontal(|ui| {
                 ui.label("Font: ");
-                egui::ComboBox::from_label("")
+                egui::ComboBox::from_id_source("dropdown_font")
 					.selected_text(format!("{}", config.font.to_string()))
 					.show_ui(ui, |ui| {
 						ui.style_mut().wrap = Some(false);
@@ -193,6 +272,20 @@ pub fn init_gui(teleprompters_config_tx: Sender<TeleprompterConfig>) {
 				ui.color_edit_button_rgb(&mut config.background_color);
 			});
 
+			// Align
+			ui.horizontal(|ui| {
+                ui.label("Align: ");
+                egui::ComboBox::from_id_source("dropdown_align")
+					.selected_text(format!("{}", config.align.to_string()))
+					.show_ui(ui, |ui| {
+						ui.style_mut().wrap = Some(false);
+						ui.set_min_width(60.0);
+						ui.selectable_value(&mut config.align, Align::Left, "Left");
+						ui.selectable_value(&mut config.align, Align::Center, "Center");
+						ui.selectable_value(&mut config.align, Align::Right, "Right");
+					});
+            });
+
 			// Mirrored
 			ui.horizontal(|ui| {
 				ui.label("Mirrored: ");
@@ -222,12 +315,11 @@ pub fn init_gui(teleprompters_config_tx: Sender<TeleprompterConfig>) {
 
 		// Send the teleprompter config on the channel, but only if it has changed
 		if config != config_previous {
-			// If only the progress has changed (while playing), only send it every 30 frames
-			if config.progress == config_previous.progress || config.playing == false {
-				teleprompters_config_tx.send(config.clone()).unwrap();
-				config_previous = config.clone();
-			} else if frame % 30 == 0 {
-				teleprompters_config_tx.send(config.clone()).unwrap();
+			// If only the progress has changed (while playing), only send it every 50 ms
+			if config.playing && !config.only_progress_changed(&config_previous) ||
+			   config.playing && config.only_progress_changed(&config_previous) && time_elapsed % DEBUG_LATENCY == 0 ||
+			  !config.playing {
+				teleprompters_config_bus.send(config.clone()).unwrap();
 				config_previous = config.clone();
 			}
 		}

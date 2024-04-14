@@ -65,6 +65,7 @@ impl TeleprompterConfig {
 		   self.font_size == other.font_size &&
 		   self.font_color == other.font_color &&
 		   self.background_color == other.background_color &&
+		   self.align == other.align &&
 		   self.mirrored == other.mirrored &&
 		   self.reversed == other.reversed {
 			true
@@ -103,7 +104,8 @@ impl ToString for Font {
 pub enum Align {
 	Left,
 	Center,
-	Right
+	Right,
+	Justify
 }
 
 impl ToString for Align {
@@ -112,6 +114,7 @@ impl ToString for Align {
 			Align::Left => "Left".to_string(),
 			Align::Center => "Center".to_string(),
 			Align::Right => "Right".to_string(),
+			Align::Justify => "Justify".to_string(),
 		}
 	}
 }
@@ -283,6 +286,7 @@ pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>) {
 						ui.selectable_value(&mut config.align, Align::Left, "Left");
 						ui.selectable_value(&mut config.align, Align::Center, "Center");
 						ui.selectable_value(&mut config.align, Align::Right, "Right");
+						ui.selectable_value(&mut config.align, Align::Justify, "Justify");
 					});
             });
 

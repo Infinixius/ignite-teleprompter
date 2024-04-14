@@ -90,7 +90,10 @@
 				document.querySelector("#text").style.color = convertRGB(message.font_color[0], message.font_color[1], message.font_color[2])
 				document.body.style.backgroundColor = convertRGB(message.background_color[0], message.background_color[1], message.background_color[2])
 
-				// TODO: Implement alignment
+				if (message.align == "Left") document.querySelector("#text").style.textAlign = "left"
+				if (message.align == "Center") document.querySelector("#text").style.textAlign = "center"
+				if (message.align == "Right") document.querySelector("#text").style.textAlign = "right"
+				if (message.align == "Justify") document.querySelector("#text").style.textAlign = "justify"
 
 				if (message.mirrored) {
 					document.querySelector("#text").classList.add("mirrored")

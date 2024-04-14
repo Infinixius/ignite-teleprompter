@@ -7,7 +7,6 @@ use serde::{Serialize, Deserialize};
 use std::time::Instant;
 use tokio::sync::broadcast::Sender;
 
-use crate::{DEBUG_LATENCY, PORT};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TeleprompterConfig {
 	playing: bool,
@@ -138,7 +137,8 @@ fn load_icon() -> IconData {
     }
 }
 
-pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>) {
+#[allow(non_snake_case)]
+pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>, DEBUG: bool, PORT: u16) {
 	let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder {
 			inner_size: Some(Vec2::new(300.0, 530.0)),
@@ -150,7 +150,10 @@ pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>) {
         ..Default::default()
     };
 
-	let mut config = TeleprompterConfig::default();
+	let mut config = TeleprompterConfig {
+		debug: DEBUG,
+		..TeleprompterConfig::default()
+	};
 	let mut config_previous =  TeleprompterConfig::default();
 
 	let mut clipboard: ClipboardContext = ClipboardProvider::new().unwrap();
@@ -321,7 +324,7 @@ pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>) {
 		if config != config_previous {
 			// If only the progress has changed (while playing), only send it every 50 ms
 			if config.playing && !config.only_progress_changed(&config_previous) ||
-			   config.playing && config.only_progress_changed(&config_previous) && time_elapsed % DEBUG_LATENCY == 0 ||
+			   config.playing && config.only_progress_changed(&config_previous) && time_elapsed % 50 == 0 ||
 			  !config.playing {
 				teleprompters_config_bus.send(config.clone()).unwrap();
 				config_previous = config.clone();

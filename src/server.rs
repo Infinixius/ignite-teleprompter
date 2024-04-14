@@ -7,7 +7,6 @@ use warp::ws::{Message, Ws, WebSocket};
 use warp::Filter;
 
 use crate::gui::TeleprompterConfig;
-use crate::{{ADDRESS, PORT}};
 
 #[derive(Debug, Clone)]
 pub struct Teleprompter {
@@ -15,7 +14,8 @@ pub struct Teleprompter {
 	pub connected_at: i64,
 }
 
-pub async fn start_server(teleprompters_config_bus: Sender<TeleprompterConfig>) {
+#[allow(non_snake_case)]
+pub async fn start_server(teleprompters_config_bus: Sender<TeleprompterConfig>, ADDRESS: String, PORT: u16) {
     let initial_config: Arc<RwLock<TeleprompterConfig>> = Arc::new(RwLock::new(TeleprompterConfig::default()));
     let mut initial_config_rx = teleprompters_config_bus.subscribe();
 

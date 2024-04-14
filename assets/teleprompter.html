@@ -1,3 +1,4 @@
+<!-- All of the teleprompter code is contained within this file, no external .css, .js, or libraries -->
 <!DOCTYPE html>
 <html>
 	<head>
@@ -162,6 +163,7 @@
 		</script>
 		<script>
 			// Keep the screen on by playing an empty video
+			// https://stackoverflow.com/questions/11529247/in-html5-how-can-i-keep-an-android-device-s-screen-on
 			const video = document.createElement("video")
 			video.setAttribute("playsinline", "")
 			video.setAttribute("loop", "")

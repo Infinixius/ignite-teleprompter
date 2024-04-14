@@ -138,6 +138,7 @@ fn load_icon() -> IconData {
     }
 }
 
+// TODO: Windows icon
 #[allow(non_snake_case)]
 pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>, DEBUG: bool, PORT: u16) {
 	let options = eframe::NativeOptions {
@@ -323,6 +324,7 @@ pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>, DEBUG: boo
 					);
 				});
 
+			// TODO: Add a link to the GitHub repository
         });
 
 		// Send the teleprompter config on the channel, but only if it has changed

@@ -3,9 +3,7 @@ name = "ignite-teleprompter"
 version = "0.1.0"
 edition = "2021"
 
-[patch.crates-io]
-# Fixes https://github.com/Infinixius/ignite-teleprompter/security/dependabot/16
-traitobject = { git = "https://github.com/fralalonde/traitobject_patch", tag = "0.1.1" }
+# [patch.crates-io]
 
 [dependencies]
 chrono = "0.4.35"
@@ -22,4 +20,3 @@ serde_json = "1.0.115"
 tokio = { version= "1.37.0", features = ["full"] } 
 tokio-stream = "0.1.15"
 warp = "0.3.6"
-websocket = "0.27.0"

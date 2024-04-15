@@ -3,11 +3,9 @@ name = "ignite-teleprompter"
 version = "0.1.0"
 edition = "2021"
 
-# [patch.crates-io]
-
 [dependencies]
 chrono = "0.4.35"
-clipboard = "0.5.0"
+copypasta = "0.10.1"
 eframe = "0.27.0"
 egui = { version = "0.27.0", features = ["serde"]}
 futures-util = "0.3.30"

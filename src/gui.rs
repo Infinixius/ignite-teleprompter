@@ -1,4 +1,4 @@
-use clipboard::{ClipboardContext, ClipboardProvider};
+use copypasta::{ClipboardContext, ClipboardProvider};
 use eframe::egui;
 use egui::{IconData, ScrollArea, TextEdit, Vec2};
 use image;
@@ -158,7 +158,7 @@ pub fn init_gui(teleprompters_config_bus: Sender<TeleprompterConfig>, DEBUG: boo
 	};
 	let mut config_previous =  TeleprompterConfig::default();
 
-	let mut clipboard: ClipboardContext = ClipboardProvider::new().expect("Failed to initialize clipboard");
+	let mut clipboard: ClipboardContext = ClipboardContext::new().expect("Failed to initialize clipboard");
 	let mut clipboard_timeout: i8 = 0;
 
 	// Get our IP address on the network that other devices use to connect to us
